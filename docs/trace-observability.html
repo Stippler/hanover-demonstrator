@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Trace observability — Hanover Ski Passport Demonstrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a222d;
+      --surface2: #232d3b;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #38bdf8;
+      --green: #4ade80;
+      --amber: #fbbf24;
+      --violet: #a78bfa;
+      --orange: #fb923c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+    .wrap { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2rem;
+      margin-bottom: 2.5rem;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+    .lede { color: var(--muted); font-size: 1.1rem; max-width: 42rem; margin: 0; }
+    p.muted { color: var(--muted); font-size: 0.95rem; }
+    nav.toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    nav.toc h2 { margin: 0 0 0.75rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    nav.toc ul { margin: 0; padding-left: 1.25rem; }
+    nav.toc a { color: var(--accent); text-decoration: none; }
+    nav.toc a:hover { text-decoration: underline; }
+    h2 {
+      font-size: 1.35rem;
+      margin: 2.5rem 0 1rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--accent);
+    }
+    h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    h3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; color: var(--text); }
+    p { margin: 0.75rem 0; color: var(--text); }
+    code, .mono { font-family: "JetBrains Mono", monospace; font-size: 0.88em; }
+    .pill {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 0.35rem;
+    }
+    .pill-api { background: #164e63; color: #a5f3fc; }
+    .pill-edc { background: #14532d; color: #bbf7d0; }
+    .pill-db { background: #4c1d95; color: #ddd6fe; }
+
+    /* Flow diagram (HTML/CSS) */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+    .flow-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: stretch;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+    .flow-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      min-width: 140px;
+      text-align: center;
+    }
+    .flow-box strong { display: block; margin-bottom: 0.25rem; }
+    .flow-box span { color: var(--muted); font-size: 0.8rem; }
+    .flow-arrow {
+      align-self: center;
+      color: var(--amber);
+      font-weight: 700;
+      font-size: 0.75rem;
+      padding: 0 0.25rem;
+    }
+    .flow-legend { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; text-align: center; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--surface); color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      overflow-x: auto;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+    .callout {
+      border-left: 4px solid var(--violet);
+      background: var(--surface);
+      padding: 1rem 1.25rem;
+      border-radius: 0 10px 10px 0;
+      margin: 1.25rem 0;
+    }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* Passport request flow: single-column pipeline (HTML only) */
+    .req-flow {
+      margin: 2rem 0;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: linear-gradient(165deg, #f8fafc 0%, #eef2f6 100%);
+      color: #0f172a;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      overflow: hidden;
+    }
+    .req-flow-inner {
+      padding: 1.5rem 1.25rem 1.25rem;
+      max-width: 34rem;
+      margin: 0 auto;
+    }
+    @media (min-width: 640px) {
+      .req-flow-inner { padding: 1.75rem 1.75rem 1.5rem; }
+    }
+    .req-flow-h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      text-align: center;
+    }
+    .req-flow-tagline {
+      margin: 0 0 1rem;
+      text-align: center;
+      font-size: 0.88rem;
+      color: #64748b;
+      line-height: 1.45;
+    }
+    .rf-phases {
+      list-style: none;
+      margin: 0 0 1.25rem;
+      padding: 0.6rem 0.75rem;
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      color: #1e293b;
+      line-height: 1.55;
+    }
+    .rf-phases li { margin: 0.2rem 0; padding-left: 0.5rem; border-left: 3px solid #cbd5e1; }
+    .rf-phases li:nth-child(1) { border-left-color: #1e293b; }
+    .rf-phases li:nth-child(2) { border-left-color: #0f766e; }
+    .rf-phases li:nth-child(3) { border-left-color: #5b21b6; }
+    .rf-phases strong { color: #0f172a; }
+
+    .rf-pipeline {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .rf-pipeline > li {
+      margin: 0;
+      padding: 0;
+    }
+
+    .rf-node {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+      border: 2px solid #e2e8f0;
+    }
+    .rf-node h3 {
+      margin: 0 0 0.25rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .rf-node .rf-sub {
+      margin: 0.2rem 0 0;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #1e293b;
+    }
+    .rf-node .rf-sub:first-of-type { margin-top: 0; }
+    .rf-node--blue { border-color: #38bdf8; }
+    .rf-node--blue h3 { color: #0369a1; }
+    .rf-node--teal { border-color: #2dd4bf; background: #f0fdfa; }
+    .rf-node--teal h3 { color: #0f766e; }
+    .rf-node--green { border-color: #4ade80; }
+    .rf-node--green h3 { color: #15803d; }
+    .rf-node--orange { border-color: #fb923c; background: #fff7ed; }
+    .rf-node--orange h3 { color: #c2410c; }
+    .rf-node--violet { border-color: #a78bfa; background: #faf5ff; }
+    .rf-node--violet h3 { color: #5b21b6; }
+
+    .rf-chev-down {
+      display: flex;
+      justify-content: center;
+      padding: 0.2rem 0 0.35rem;
+      color: #475569;
+      font-size: 1.15rem;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .rf-conn {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      margin: 0.35rem 0 0.5rem;
+      padding: 0.55rem 0.7rem;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      color: #334155;
+    }
+    .rf-conn--teal { border-left: 4px solid #0f766e; background: #ecfdf5; }
+    .rf-conn--orange { border-left: 4px solid #ea580c; background: #fff7ed; }
+    .rf-conn--violet { border-left: 4px solid #7c3aed; background: #f5f3ff; }
+
+    .rf-num {
+      flex-shrink: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: #fff;
+      background: #334155;
+      margin-top: 0.1rem;
+    }
+    .rf-conn--teal .rf-num { background: #0f766e; }
+    .rf-conn--orange .rf-num { background: #ea580c; }
+    .rf-conn--violet .rf-num { background: #5b21b6; }
+
+    .rf-conn-title {
+      margin: 0;
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 0.78rem;
+    }
+    .rf-conn-fromto {
+      margin: 0.25rem 0 0;
+      font-size: 0.76rem;
+      color: #1e293b;
+    }
+    .rf-conn-fromto strong { color: #0f172a; }
+    .rf-conn-tech {
+      margin: 0.35rem 0 0;
+      font-size: 0.68rem;
+      color: #334155;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .rf-conn .rf-conn-title { color: #0f172a; }
+    .rf-conn .rf-conn-fromto { color: #1e293b; }
+    .rf-conn .rf-conn-fromto strong { color: #0f172a; }
+
+    .rf-aside {
+      margin: 0.75rem 0;
+      padding: 0.65rem 0.85rem;
+      background: #fef9c3;
+      border: 2px solid #eab308;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: #422006;
+    }
+    .rf-aside strong { color: #0f172a; }
+
+    .rf-section-label {
+      margin: 1.25rem 0 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #0f172a;
+      text-align: center;
+    }
+
+    .rf-divider {
+      margin: 1.35rem 0 0.75rem;
+      border: none;
+      border-top: 2px solid #cbd5e1;
+    }
+    .rf-dp-title {
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #4c1d95;
+      margin: 0 0 0.75rem;
+      line-height: 1.45;
+    }
+
+    .rf-foot {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      background: #fff;
+      border: 1px solid #94a3b8;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      color: #334155;
+      text-align: left;
+      line-height: 1.55;
+    }
+    .req-flow .mono { color: #0f172a; background: #e2e8f0; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.88em; }
+    /* Force readable text inside light panel (no washed-out grey) */
+    .req-flow { --rf-text: #0f172a; --rf-muted: #334155; }
+    .req-flow p:not(.rf-conn-tech):not(.rf-conn-title):not(.rf-conn-fromto),
+    .req-flow li,
+    .req-flow h2,
+    .req-flow h3 { color: var(--rf-text); }
+    .req-flow .rf-foot { color: #334155; }
+    .req-flow .req-flow-tagline { color: #475569; }
+
+    /* Tutorial / foundations (dark theme blocks) */
+    .edu-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.35rem 1.4rem;
+      margin: 1.75rem 0;
+    }
+    .edu-block > h2 {
+      margin: 0 0 0.75rem;
+      padding: 0;
+      border: none;
+      font-size: 1.28rem;
+      color: var(--accent);
+    }
+    .edu-block > h2:first-child { margin-top: 0; }
+    .edu-block h3 {
+      margin: 1.35rem 0 0.5rem;
+      font-size: 1.02rem;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+    .edu-block h3:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    .edu-block h4 {
+      margin: 1rem 0 0.35rem;
+      font-size: 0.92rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .edu-block p, .edu-block li {
+      font-size: 0.93rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+    .edu-block ul, .edu-block ol { margin: 0.5rem 0; padding-left: 1.35rem; }
+    .edu-block li { margin: 0.35rem 0; }
+    .edu-callout {
+      border-left: 4px solid var(--accent);
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      background: var(--surface2);
+      border-radius: 0 10px 10px 0;
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+    .edu-callout strong { color: var(--text); }
+    .edu-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      margin: 0.75rem 0;
+    }
+    .edu-table th, .edu-table td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    .edu-table th { background: var(--surface2); color: var(--muted); font-weight: 600; }
+    .edu-seq {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.78rem;
+      background: var(--surface2);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin: 0.75rem 0;
+      line-height: 1.5;
+      color: var(--text);
+      overflow-x: auto;
+    }
+    .edu-block code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.88em;
+      background: var(--surface2);
+      padding: 0.12em 0.4em;
+      border-radius: 4px;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Trace observability</h1>
+      <p class="lede">
+        How the demonstrator records <strong>lookup traces</strong>, plus a <strong>practical tutorial</strong> on Eclipse EDC, Gaia-X, and <span class="mono">/.well-known</span> documents, then the <strong>exact request path</strong> as implemented in code and a <strong>connector-centric mental model</strong> of the same flow.
+        Open this file in a browser: <span class="mono">docs/trace-observability.html</span>.
+      </p>
+    </header>
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>On this page</h2>
+      <ul>
+        <li><a href="#overview">Overview (trace system)</a></li>
+        <li><a href="#implemented-flow">1. How it works today (this repo)</a></li>
+        <li><a href="#edc-foundations">2. Tutorial: Eclipse EDC</a></li>
+        <li><a href="#gaiax-foundations">3. Tutorial: Gaia-X (this demo)</a></li>
+        <li><a href="#well-known-docs">4. Tutorial: DID Web &amp; well-known</a></li>
+        <li><a href="#conceptual-flow">5. Mental model: connectors end-to-end</a></li>
+        <li><a href="#pipeline">Ingestion pipeline</a></li>
+        <li><a href="#schema">Database schema</a></li>
+        <li><a href="#api">Trace API endpoints</a></li>
+        <li><a href="#sources">Event sources</a></li>
+        <li><a href="#event-types">Event types (catalog)</a></li>
+        <li><a href="#dashboard">Trace Dashboard (UI)</a></li>
+        <li><a href="#docker">Docker &amp; routing</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="overview">Overview</h2>
+    <p>
+      <span class="pill pill-api">trace-api</span>
+      is a FastAPI service that exposes <span class="mono">POST /api/traces</span> (and batch) with <strong>no auth</strong> so internal services and the Java EDC extension can POST events quickly.
+      Events are stored in Postgres (<span class="mono">hanover.trace_events</span>). The
+      <span class="pill pill-api">trace-dashboard-ui</span>
+      Next.js app calls authenticated GET endpoints to list traces, show waterfalls, stats, and the EDC access matrix.
+    </p>
+    <p>
+      A single user action (e.g. QR lookup) shares one <span class="mono">trace_id</span> (UUID). Optional <span class="mono">span_id</span> / <span class="mono">parent_span_id</span> nest steps for timeline views.
+    </p>
+
+    <section class="req-flow" id="implemented-flow" aria-labelledby="req-flow-title">
+      <div class="req-flow-inner">
+        <h2 id="req-flow-title" class="req-flow-h2">1. How it works today (this repository)</h2>
+        <p class="req-flow-tagline">Below is the <strong>actual</strong> call sequence implemented in <span class="mono">repair_api/main.py</span>, the EDC containers, and <span class="mono">dpp-api</span>. Read top to bottom: each card is a component; each shaded strip is one network hop. After this section, tutorials explain <em>why</em> these steps exist; the last section reframes the same story in &ldquo;pure connector&rdquo; language.</p>
+        <ul class="rf-phases" role="list">
+          <li><strong>Repair shop</strong> — browser UI and FastAPI orchestration</li>
+          <li><strong>Control plane</strong> — EDC management + DSP between connectors; Gaia-X during negotiation</li>
+          <li><strong>Data plane</strong> — HttpData-PULL with EDR token to provider DP, then proxy to DPP API</li>
+        </ul>
+
+        <p class="rf-section-label">Control plane (one QR lookup)</p>
+        <ol class="rf-pipeline">
+          <li>
+            <article class="rf-node rf-node--blue">
+              <h3>Repair Shop Web</h3>
+              <p class="rf-sub">Next.js app <span class="mono">repair-ui</span>. User scans QR; app calls your API.</p>
+            </article>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn">
+              <span class="rf-num" aria-hidden="true">1</span>
+              <div>
+                <p class="rf-conn-title">HTTPS to Repair API</p>
+                <p class="rf-conn-fromto"><strong>From:</strong> browser &nbsp; <strong>To:</strong> <span class="mono">repair-api:8000</span> (Caddy: <span class="mono">repair.*</span>, path <span class="mono">/api/*</span>)</p>
+                <p class="rf-conn-tech">Typical: <span class="mono">POST /api/lookup</span> with serial number</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--blue">
+              <h3>Repair Shop API</h3>
+              <p class="rf-sub">FastAPI <span class="mono">repair-api</span>. Drives catalog request, contract negotiation, transfer, EDR retrieval.</p>
+            </article>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn rf-conn--teal">
+              <span class="rf-num" aria-hidden="true">2</span>
+              <div>
+                <p class="rf-conn-title">EDC Management API (consumer)</p>
+                <p class="rf-conn-fromto"><strong>From:</strong> <span class="mono">repair-api</span> &nbsp; <strong>To:</strong> <span class="mono">repair-edc-cp:9191</span> <span class="mono">/api/management/...</span></p>
+                <p class="rf-conn-tech">JSON-LD calls: catalog request, negotiate, start transfer, poll for EDR</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--teal">
+              <h3>Repair EDC Control Plane</h3>
+              <p class="rf-sub">Container <span class="mono">repair-edc-cp</span>. Your connector&rsquo;s <strong>control plane</strong>: it speaks DSP to the DPP connector, runs consumer-side negotiation/transfer state, and exposes the <strong>management API</strong> that <span class="mono">repair-api</span> calls. Ports: <span class="mono">9191</span> management, <span class="mono">9292</span> DSP.</p>
+            </article>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn rf-conn--teal">
+              <span class="rf-num" aria-hidden="true">3</span>
+              <div>
+                <p class="rf-conn-title">DSP (Dataspace Protocol)</p>
+                <p class="rf-conn-fromto"><strong>Between:</strong> <span class="mono">repair-edc-cp</span> &#8596; <span class="mono">dpp-edc-cp</span> &nbsp;(<span class="mono">:9292</span>, JSON-LD)</p>
+                <p class="rf-conn-tech">Federated catalog, contract negotiation, agreement. Not the same as management REST.</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--green">
+              <h3>DPP EDC Control Plane</h3>
+              <p class="rf-sub">Container <span class="mono">dpp-edc-cp</span>. Publishes offers; runs Gaia-X policy extension during negotiation.</p>
+            </article>
+          </li>
+          <li>
+            <aside class="rf-aside">
+              <strong>Startup only (not each lookup):</strong> <span class="mono">dpp-api</span> POSTs asset, policy, and contract definition to <span class="mono">dpp-edc-cp:9191</span> so the catalog is populated (<span class="mono">EDC_SEED_ENABLED</span>).
+            </aside>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn rf-conn--orange">
+              <span class="rf-num" aria-hidden="true">4</span>
+              <div>
+                <p class="rf-conn-title">Gaia-X compliance check</p>
+                <p class="rf-conn-fromto"><strong>From:</strong> <span class="mono">dpp-edc-cp</span> (Java extension) &nbsp; <strong>To:</strong> <span class="mono">gx-compliance:3000</span></p>
+                <p class="rf-conn-tech">During policy evaluation: extension resolves counterparty DID / participant info (HTTPS to <span class="mono">edc-repair-shop.*</span> well-known), builds VP-JWT, POSTs to compliance; pass/fail gates negotiation</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--orange">
+              <h3>Gaia-X Compliance</h3>
+              <p class="rf-sub">Service <span class="mono">gx-compliance</span> (+ Memgraph). Verifies presentations from the connector extension.</p>
+            </article>
+          </li>
+          <li>
+            <article class="rf-node rf-node--teal" style="margin-top:0.35rem;">
+              <h3>Repair EDC Data Plane (consumer)</h3>
+              <p class="rf-sub">Container <span class="mono">repair-edc-dp</span>. Part of the <strong>same consumer connector</strong> as <span class="mono">repair-edc-cp</span> (registered on the CP). For <strong>HttpData-PULL</strong> in this codebase, the <strong>HTTP GET</strong> that downloads the passport is executed by <span class="mono">repair-api</span> against the <strong>URL inside the EDR</strong>, which points at the <strong>DPP provider data plane</strong> (<span class="mono">dpp-edc-dp</span>), not at <span class="mono">repair-edc-dp</span>. The consumer DP still matters for how EDC provisions the transfer and endpoint metadata.</p>
+            </article>
+          </li>
+        </ol>
+
+        <hr class="rf-divider"/>
+        <p class="rf-dp-title">Data plane (after contract finalized and EDR is available; still the same <span class="mono">repair-api</span> process)</p>
+        <ol class="rf-pipeline">
+          <li>
+            <article class="rf-node rf-node--violet">
+              <h3>Repair Shop API (again)</h3>
+              <p class="rf-sub">Uses the EDR token from the transfer to call the provider data plane public URL.</p>
+            </article>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn rf-conn--violet">
+              <span class="rf-num" aria-hidden="true">5</span>
+              <div>
+                <p class="rf-conn-title">HttpData-PULL (application holds the EDR)</p>
+                <p class="rf-conn-fromto"><strong>HTTP client:</strong> <span class="mono">repair-api</span> (Python <span class="mono">httpx</span>) &nbsp; <strong>To:</strong> base URL from EDR <span class="mono">endpoint</span> field (in practice: <span class="mono">dpp-edc-dp</span> public port, e.g. <span class="mono">:9291</span>)</p>
+                <p class="rf-conn-tech"><span class="mono">GET {endpoint}/skis/{serial}/passport</span> with header from EDR (<span class="mono">authKey</span> / <span class="mono">authCode</span> or <span class="mono">Authorization</span>)</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--violet">
+              <h3>DPP EDC Data Plane</h3>
+              <p class="rf-sub">Container <span class="mono">dpp-edc-dp</span>. Validates token, forwards to backend URL configured on the asset.</p>
+            </article>
+          </li>
+          <li>
+            <div class="rf-chev-down" aria-hidden="true">&#9660;</div>
+            <div class="rf-conn rf-conn--violet">
+              <span class="rf-num" aria-hidden="true">6</span>
+              <div>
+                <p class="rf-conn-title">Internal proxy to passport API</p>
+                <p class="rf-conn-fromto"><strong>From:</strong> <span class="mono">dpp-edc-dp</span> &nbsp; <strong>To:</strong> <span class="mono">dpp-api:8000</span> (Docker network)</p>
+                <p class="rf-conn-tech">HttpData source URL on asset points here</p>
+              </div>
+            </div>
+          </li>
+          <li>
+            <article class="rf-node rf-node--violet">
+              <h3>DPP API</h3>
+              <p class="rf-sub">FastAPI <span class="mono">dpp-api</span>. Reads Postgres; response is proxied back through <span class="mono">dpp-edc-dp</span> to <span class="mono">repair-api</span>, then to the browser.</p>
+            </article>
+          </li>
+        </ol>
+
+        <div class="rf-foot">
+          <strong>Caddy</strong> routes: <span class="mono">repair.*</span> | <span class="mono">dpp.*</span> | <span class="mono">edc-repair-shop.*</span> | <span class="mono">edc-dpp.*</span> | <span class="mono">traces.*</span> | <span class="mono">compliance.*</span><br/>
+          README diagram: <span class="mono">docs/images/architecture-overview.svg</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="edu-block" id="edc-foundations">
+      <h2>2. Tutorial: Eclipse EDC (what the jargon means)</h2>
+      <p><strong>Eclipse Dataspace Components (EDC)</strong> are software connectors that sit between a participant&rsquo;s internal systems and a <em>federated dataspace</em>. Instead of sharing one database password, each side exposes a connector. The connector enforces <strong>contracts</strong> (who may see which data, under which policy) before any payload moves.</p>
+
+      <h3>Control plane vs data plane</h3>
+      <table class="edu-table">
+        <thead><tr><th>Part</th><th>Role</th><th>In this demo</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Control plane (CP)</strong></td><td>Policy, catalog, contract negotiation, transfer orchestration. Exposes a <strong>Management API</strong> for your apps and speaks <strong>DSP</strong> to remote connectors.</td><td><span class="mono">repair-edc-cp</span>, <span class="mono">dpp-edc-cp</span></td></tr>
+          <tr><td><strong>Data plane (DP)</strong></td><td>Moves bytes. Validates tokens from a transfer (EDR). For HttpData assets, forwards HTTP to a configured backend URL.</td><td><span class="mono">repair-edc-dp</span>, <span class="mono">dpp-edc-dp</span></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Typical sequence (names only)</h3>
+      <ol>
+        <li><strong>Catalog</strong> — Consumer learns what datasets exist (DSP to provider CP).</li>
+        <li><strong>Contract negotiation</strong> — Both connectors agree on an <strong>offer</strong> and <strong>policy</strong> (still CP / DSP).</li>
+        <li><strong>Contract agreement</strong> — Negotiation reaches a terminal success state.</li>
+        <li><strong>Transfer process</strong> — CPs start a transfer (e.g. <code>HttpData-PULL</code>).</li>
+        <li><strong>EDR (Endpoint Data Reference)</strong> — Consumer receives a short-lived token and a <strong>base URL</strong> (usually the <strong>provider data plane</strong>) allowed for this transfer.</li>
+        <li><strong>Data access</strong> — Some component performs HTTP to that URL with the token. In <em>this</em> repo, that component is <span class="mono">repair-api</span>, not a separate microservice.</li>
+      </ol>
+
+      <div class="edu-callout">
+        <strong>Why <span class="mono">repair-api</span> talks to management and not only to DSP:</strong> The public Management API is the supported way for an application to drive catalog requests, negotiations, transfers, and EDR retrieval against <em>its own</em> connector. DSP is connector-to-connector; management is app-to-own-connector.
+      </div>
+    </section>
+
+    <section class="edu-block" id="gaiax-foundations">
+      <h2>3. Tutorial: Gaia-X in this demonstrator</h2>
+      <p><strong>Gaia-X</strong> (here) is a <strong>trust and compliance</strong> layer on top of EDC: before or while a contract is evaluated, the <strong>provider</strong> can require evidence that the counterparty meets a policy (e.g. &ldquo;Gaia-X compliant&rdquo;).</p>
+
+      <h3>What happens during negotiation</h3>
+      <p>On <span class="mono">dpp-edc-cp</span>, a custom Java extension (<span class="mono">gaiax-auth-extension</span>) ties into the policy engine. When the policy requires <span class="mono">gaiaxCompliant</span>, the extension roughly:</p>
+      <ol>
+        <li>Resolves the other party&rsquo;s identity via <strong>DID Web</strong> (see next section) and related metadata.</li>
+        <li>Builds <strong>verifiable credentials</strong> and a <strong>verifiable presentation (VP)</strong>.</li>
+        <li>POSTs the VP to <span class="mono">gx-compliance</span>.</li>
+        <li>If verification succeeds, negotiation can proceed; if not, it fails.</li>
+      </ol>
+
+      <h3>What Gaia-X is <em>not</em> here</h3>
+      <p>There is no separate &ldquo;Gaia-X bridge&rdquo; in the default compose path for this repair flow. Compliance is triggered from <strong>inside the DPP control plane</strong> during policy evaluation. Trace events still let you see those steps in the dashboard.</p>
+    </section>
+
+    <section class="edu-block" id="well-known-docs">
+      <h2>4. Tutorial: DID Web &amp; <span class="mono">/.well-known</span></h2>
+      <p>Connectors need a stable way to say &ldquo;I am participant X.&rdquo; This stack uses <strong>did:web</strong>: the DID document is served over HTTPS at a well-known path on the connector&rsquo;s host.</p>
+
+      <h3>Paths (via Caddy)</h3>
+      <p>Caddy rewrites <span class="mono">/.well-known/did.json</span> (and related paths) to the control plane&rsquo;s API context so the <strong>did-web-extension</strong> can serve:</p>
+      <ul>
+        <li><span class="mono">/.well-known/did.json</span> — W3C DID document (includes verification methods for the connector).</li>
+        <li><span class="mono">/.well-known/participant.json</span> — Participant / self-description metadata used in the Gaia-X flow.</li>
+        <li><span class="mono">/.well-known/x509CertificateChain.pem</span> — Certificate chain for TLS / signing alignment.</li>
+      </ul>
+      <p>Hosts are per connector, e.g. <span class="mono">edc-repair-shop.&lt;domain&gt;</span> and <span class="mono">edc-dpp.&lt;domain&gt;</span> (see <span class="mono">caddy/Caddyfile</span>).</p>
+
+      <h3>Both sides publish credentials</h3>
+      <p><strong>Provider (DPP)</strong> and <strong>consumer (Repair Shop)</strong> each run an EDC control plane with the same well-known endpoints on their own host. It is not only the passport publisher that needs a DID:</p>
+      <ul>
+        <li><span class="mono">https://edc-dpp.&lt;domain&gt;/.well-known/did.json</span> (and <span class="mono">participant.json</span>) — identity of the <strong>data provider</strong> connector.</li>
+        <li><span class="mono">https://edc-repair-shop.&lt;domain&gt;/.well-known/did.json</span> (and <span class="mono">participant.json</span>) — identity of the <strong>repair shop / consumer</strong> connector.</li>
+      </ul>
+      <p>When the repair shop asks for the ski product passport, the <strong>provider&rsquo;s</strong> connector evaluates policy. For Gaia-X constraints it must resolve <strong>who the counterparty is</strong> — that means HTTPS fetches against the <strong>consumer&rsquo;s</strong> well-known URLs (repair), not only the provider&rsquo;s.</p>
+
+      <div class="edu-callout">
+        <strong>Why this matters:</strong> During Gaia-X verification the DPP connector must <strong>know who the repair connector is</strong> in a verifiable way. Fetching <span class="mono">did.json</span> / <span class="mono">participant.json</span> from <span class="mono">edc-repair-shop.*</span> is how that binding is established before <span class="mono">gx-compliance</span> sees a VP. In the Trace Dashboard &rarr; <strong>Access Control</strong>, open the <strong>Repair Shop (consumer)</strong> card to inspect the same documents the provider side resolves.
+      </div>
+    </section>
+
+    <section class="req-flow" id="conceptual-flow" aria-labelledby="conceptual-title">
+      <div class="req-flow-inner">
+        <h2 id="conceptual-title" class="req-flow-h2">5. Mental model: connectors end-to-end (after reading the above)</h2>
+        <p class="req-flow-tagline">This is the <strong>same story</strong> as section 1, described the way people often explain EDC aloud. The only deliberate difference is <em>who</em> performs the final HTTP pull: conceptually &ldquo;the consumer side of the dataspace&rdquo; pulls from &ldquo;the provider side&rdquo;; in code, that pull is implemented inside <span class="mono">repair-api</span> using the EDR your consumer CP helped create.</p>
+
+        <div class="edu-seq">
+          Repair Shop Web<br/>
+          &nbsp;&nbsp;&#8595; HTTPS<br/>
+          Repair Shop API &nbsp;&rarr;&nbsp; <em>management</em> &nbsp;&rarr;&nbsp; <strong>Repair EDC connector</strong> (control plane drives DSP)<br/>
+          &nbsp;&nbsp;&#8595; DSP (contract talk)<br/>
+          <strong>DPP EDC connector</strong> control plane &nbsp;&larr;&rarr;&nbsp; trust: provider + <strong>consumer</strong> <span class="mono">did.json</span> / <span class="mono">participant.json</span> (repair well-known) + Gaia-X VP to <span class="mono">gx-compliance</span><br/>
+          &nbsp;&nbsp;&#8595; agreement + transfer<br/>
+          <strong>Data planes:</strong> consumer DP + provider DP participate in HttpData-PULL setup; <strong>provider DP</strong> serves bytes and calls <span class="mono">dpp-api</span><br/>
+          &nbsp;&nbsp;&#8593; passport JSON<br/>
+          Repair Shop API &nbsp;&rarr;&nbsp; Repair Shop Web
+        </div>
+
+        <ul class="rf-phases" role="list" style="margin-top:1rem;">
+          <li><strong>Aligns with your description:</strong> Web &rarr; API &rarr; connector (CP negotiates with DPP CP) &rarr; verification (well-known + Gaia-X) &rarr; data plane path &rarr; DPP API &rarr; data back.</li>
+          <li><strong>Implementation detail:</strong> The GET that hits <span class="mono">dpp-edc-dp</span> runs in the <span class="mono">repair-api</span> process; routing traffic through <span class="mono">repair-edc-dp</span> as an HTTP forward-proxy for that GET is <em>not</em> what <span class="mono">repair_api/main.py</span> does today.</li>
+        </ul>
+      </div>
+    </section>
+
+    <h2 id="pipeline">Ingestion pipeline</h2>
+    <p>Logical flow of <strong>trace events</strong> (how data reaches <span class="mono">trace-api</span>), not the passport HTTP path above:</p>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box"><strong>repair-api</strong><span><span class="mono">repair_api</span> (QR) + <span class="mono">repair_shop_edc</span> (management-driven EDC steps)</span></div>
+        <span class="flow-arrow">POST</span>
+        <div class="flow-box"><strong>trace-api</strong><span>/api/traces</span></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box"><strong>dpp-api</strong><span>data plane hits</span></div>
+        <span class="flow-arrow">POST</span>
+        <div class="flow-box"><strong>trace-api</strong><span>/api/traces</span></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box"><strong>EDC CP (Java)</strong><span>edc_cp_dpp / edc_cp_repair_shop</span></div>
+        <span class="flow-arrow">POST</span>
+        <div class="flow-box"><strong>trace-api</strong><span>Gaia-X + negotiation lifecycle</span></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-box"><strong>trace-dashboard-ui</strong><span>browser</span></div>
+        <span class="flow-arrow">GET + JWT</span>
+        <div class="flow-box"><strong>trace-api</strong><span>/api/traces, stats, access-matrix</span></div>
+      </div>
+      <p class="flow-legend">EDC extensions resolve <span class="mono">trace_id</span> by querying the latest <span class="mono">repair_api</span> / <span class="mono">repair_shop_edc</span> event so connector spans join the same trace.</p>
+    </div>
+
+    <h2 id="schema">Database schema</h2>
+    <p><span class="pill pill-db">hanover.trace_events</span> (from <span class="mono">002_passat_schema.sql</span>):</p>
+    <table>
+      <thead>
+        <tr><th>Column</th><th>Type</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="mono">id</span></td><td>UUID</td><td>Primary key (row id).</td></tr>
+        <tr><td><span class="mono">trace_id</span></td><td>UUID</td><td>Correlates all events for one lookup (or flow).</td></tr>
+        <tr><td><span class="mono">span_id</span></td><td>UUID</td><td>Identifies this step; paired with parent for trees.</td></tr>
+        <tr><td><span class="mono">parent_span_id</span></td><td>UUID, null</td><td>Links child span to parent for waterfall UI.</td></tr>
+        <tr><td><span class="mono">event_type</span></td><td>text</td><td>Machine-readable step name (see catalog below).</td></tr>
+        <tr><td><span class="mono">source</span></td><td>text</td><td>Emitter: <span class="mono">repair_api</span>, <span class="mono">repair_shop_edc</span>, <span class="mono">dpp_api</span>, <span class="mono">edc_cp_dpp</span>, <span class="mono">edc_cp_repair_shop</span>, …</td></tr>
+        <tr><td><span class="mono">participant_id</span></td><td>text</td><td>Optional EDC participant id (<span class="mono">dpp</span>, <span class="mono">repair_shop</span>).</td></tr>
+        <tr><td><span class="mono">serial_number</span></td><td>text</td><td>Ski serial when applicable.</td></tr>
+        <tr><td><span class="mono">payload</span></td><td>JSONB</td><td>Free-form context (negotiation ids, errors, etc.).</td></tr>
+        <tr><td><span class="mono">timestamp</span></td><td>timestamptz</td><td>When the event occurred (UTC).</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="api">Trace API endpoints</h2>
+    <p>Base URL in Docker: <span class="mono">http://trace-api:8000</span>. Via Caddy: <span class="mono">https://traces.&lt;DOMAIN&gt;/api/...</span></p>
+    <table>
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>POST</td><td><span class="mono">/api/traces</span></td><td>None</td><td>Ingest one event. Body: JSON with <span class="mono">trace_id</span>, <span class="mono">event_type</span>, <span class="mono">source</span>, optional spans, <span class="mono">payload</span>.</td></tr>
+        <tr><td>POST</td><td><span class="mono">/api/traces/batch</span></td><td>None</td><td>Ingest array <span class="mono">events</span>.</td></tr>
+        <tr><td>GET</td><td><span class="mono">/api/traces</span></td><td>JWT</td><td>Query params: <span class="mono">limit</span>, <span class="mono">offset</span>, optional filters <span class="mono">event_type</span>, <span class="mono">serial_number</span>, <span class="mono">source</span>.</td></tr>
+        <tr><td>GET</td><td><span class="mono">/api/traces/{trace_id}</span></td><td>JWT</td><td>All events for one trace, time-ordered (waterfall).</td></tr>
+        <tr><td>GET</td><td><span class="mono">/api/traces/stats</span></td><td>JWT</td><td>Aggregates by <span class="mono">event_type</span> and <span class="mono">source</span>.</td></tr>
+        <tr><td>GET</td><td><span class="mono">/api/access-matrix</span></td><td>JWT</td><td>Queries both connectors’ management APIs: assets, policies (incl. Gaia-X constraints), contract definitions, agreements.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <strong>Ingestion is open;</strong> reads require app JWT (same pattern as other backends). Configure <span class="mono">TRACE_USERS</span> in compose for dashboard login.
+    </div>
+    <h3>Example ingest payload</h3>
+    <pre>{
+  "trace_id": "550e8400-e29b-41d4-a716-446655440000",
+  "event_type": "edc_catalog_query",
+  "source": "repair_shop_edc",
+  "participant_id": "repair_shop",
+  "serial_number": "99999999",
+  "payload": { "provider_dsp": "http://dpp-edc-cp:9292/api/dsp" }
+}</pre>
+
+    <h2 id="sources">Event sources</h2>
+    <table>
+      <thead>
+        <tr><th>Source value</th><th>Origin</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="mono">repair_api</span></td><td><span class="mono">backend/repair_api/main.py</span> — QR / lookup entry and errors (<span class="mono">qr_scanned</span>, <span class="mono">lookup_error</span>).</td></tr>
+        <tr><td><span class="mono">repair_shop_edc</span></td><td>Same file — spans emitted while driving the <strong>consumer</strong> EDC via management API (catalog through data-plane fetch).</td></tr>
+        <tr><td><span class="mono">dpp_api</span></td><td><span class="mono">backend/dpp_api/main.py</span> — requests served through the data plane proxy.</td></tr>
+        <tr><td><span class="mono">edc_cp_dpp</span></td><td>DPP control plane Java extension: negotiation lifecycle, transfer lifecycle, Gaia-X trace steps emitted from <span class="mono">GaiaxComplianceClient</span>.</td></tr>
+        <tr><td><span class="mono">edc_cp_repair_shop</span></td><td>Repair control plane: same listener pattern for consumer-side negotiation/transfer events.</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Legacy <span class="mono">bridge</span> may emit traces if that stack is running; not used by the default Repair+DPP compose file.</p>
+
+    <h2 id="event-types">Event types (catalog)</h2>
+    <h3>Repair Shop orchestration (<span class="mono">repair_api</span> + <span class="mono">repair_shop_edc</span>)</h3>
+    <table>
+      <thead><tr><th>event_type</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">qr_scanned</span></td><td>Lookup started for a serial.</td></tr>
+        <tr><td><span class="mono">edc_catalog_query</span></td><td>Management API catalog request issued.</td></tr>
+        <tr><td><span class="mono">edc_catalog_received</span></td><td>Catalog response processed.</td></tr>
+        <tr><td><span class="mono">edc_contract_negotiation</span></td><td>Negotiation initiated / polling.</td></tr>
+        <tr><td><span class="mono">edc_agreement_reached</span></td><td>Contract agreed/finalized.</td></tr>
+        <tr><td><span class="mono">edc_negotiation_timeout</span></td><td>Negotiation did not complete in time.</td></tr>
+        <tr><td><span class="mono">edc_transfer_started</span></td><td>Transfer process started.</td></tr>
+        <tr><td><span class="mono">edc_edr_received</span></td><td>Endpoint Data Reference token obtained.</td></tr>
+        <tr><td><span class="mono">edc_data_plane_fetch</span></td><td>HTTP call to provider data plane.</td></tr>
+        <tr><td><span class="mono">dpp_data_returned</span></td><td>Passport JSON received.</td></tr>
+        <tr><td><span class="mono">edc_transfer_failed</span></td><td>Transfer or fetch failed.</td></tr>
+        <tr><td><span class="mono">lookup_error</span></td><td>Unhandled error in lookup.</td></tr>
+        <tr><td><span class="mono">maintenance_report_sent</span></td><td>Maintenance form submitted.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>DPP API (<span class="mono">dpp_api</span>)</h3>
+    <table>
+      <thead><tr><th>event_type</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">data_request_received</span></td><td>Proxied request hit DPP API.</td></tr>
+        <tr><td><span class="mono">data_response_sent</span></td><td>Response returned to data plane.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>EDC control plane + Gaia-X (<span class="mono">edc_cp_*</span>)</h3>
+    <p>From <span class="mono">GaiaxNegotiationListener</span> and <span class="mono">GaiaxComplianceClient</span>:</p>
+    <table>
+      <thead><tr><th>event_type</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">edc_negotiation_requested</span></td><td>Negotiation request received (provider).</td></tr>
+        <tr><td><span class="mono">edc_negotiation_accepted</span></td><td>Accepted.</td></tr>
+        <tr><td><span class="mono">edc_negotiation_agreed</span></td><td>Agreed.</td></tr>
+        <tr><td><span class="mono">edc_negotiation_finalized</span></td><td>Finalized.</td></tr>
+        <tr><td><span class="mono">edc_negotiation_terminated</span></td><td>Terminated or rejected.</td></tr>
+        <tr><td><span class="mono">edc_transfer_process_started</span></td><td>Transfer started.</td></tr>
+        <tr><td><span class="mono">edc_transfer_process_completed</span></td><td>Transfer completed.</td></tr>
+        <tr><td><span class="mono">edc_transfer_process_terminated</span></td><td>Transfer terminated.</td></tr>
+        <tr><td><span class="mono">gaiax_edc_policy_evaluation</span></td><td>Policy engine evaluating <span class="mono">gaiaxCompliant</span>.</td></tr>
+        <tr><td><span class="mono">edc_did_resolution</span></td><td>Resolving counterparty DID document.</td></tr>
+        <tr><td><span class="mono">gaiax_vc_generation</span></td><td>Building VCs.</td></tr>
+        <tr><td><span class="mono">gaiax_vp_creation</span></td><td>Wrapping VP-JWT.</td></tr>
+        <tr><td><span class="mono">gaiax_compliance_submission</span></td><td>POST to gx-compliance.</td></tr>
+        <tr><td><span class="mono">gaiax_compliance_verified</span></td><td>Compliance passed.</td></tr>
+        <tr><td><span class="mono">gaiax_compliance_rejected</span></td><td>Compliance failed.</td></tr>
+        <tr><td><span class="mono">gaiax_compliance_error</span></td><td>Exception during verification.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="dashboard">Trace Dashboard (UI)</h2>
+    <p>
+      App: <span class="mono">frontend/apps/trace-dashboard</span> (<span class="mono">APP_NAME=trace-dashboard</span>).
+      Features typically include: event log with filters, per-<span class="mono">trace_id</span> waterfall, aggregate stats, and the <strong>access matrix</strong> view backed by <span class="mono">/api/access-matrix</span>.
+    </p>
+    <p>
+      Login uses the same JWT pattern as other apps; set <span class="mono">NEXT_PUBLIC_API_URL</span> so the browser posts to <span class="mono">/api</span> on the traces host (Caddy splits UI vs API by path).
+    </p>
+
+    <h2 id="docker">Docker &amp; routing</h2>
+    <table>
+      <thead><tr><th>Service</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">trace-api</span></td><td>FastAPI, <span class="mono">APP_NAME=trace</span></td></tr>
+        <tr><td><span class="mono">trace-dashboard-ui</span></td><td>Next.js</td></tr>
+      </tbody>
+    </table>
+    <p>Caddy (<span class="mono">traces.*</span>): <span class="mono">/api/*</span> to trace-api, other paths to the dashboard. EDC connectors receive <span class="mono">GAIAX_TRACE_URL=http://trace-api:8000</span> so Java can POST traces.</p>
+
+    <footer>
+      <p>Related: <span class="mono">docs/ARCHITECTURE.md</span>, <span class="mono">docs/SUMMARY.md</span>, root <span class="mono">README.md</span> (SVG). On this page: <a href="#implemented-flow">implemented flow</a>, <a href="#conceptual-flow">conceptual flow</a>.</p>
+    </footer>
+  </div>
+</body>
+</html>

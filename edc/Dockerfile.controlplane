@@ -1,0 +1,24 @@
+FROM gradle:8.10-jdk17 AS builder
+WORKDIR /build
+COPY vendor/Template-Basic/ .
+
+# Upgrade EDC to 0.12.0, use base BOM + mock IAM + control API + JSON-LD
+# Remove example-extension, add gaiax-auth-extension
+RUN sed -i '/example-extension/d' runtimes/controlplane/build.gradle.kts && \
+    sed -i 's/edc = "0.10.1"/edc = "0.12.0"/' gradle/libs.versions.toml && \
+    sed -i 's/controlplane-dcp-bom/controlplane-base-bom/' gradle/libs.versions.toml && \
+    sed -i '/\[libraries\]/a edc-iam-mock = { module = "org.eclipse.edc:iam-mock", version.ref = "edc" }' gradle/libs.versions.toml && \
+    sed -i '/\[libraries\]/a edc-dp-selector-control-api = { module = "org.eclipse.edc:data-plane-selector-control-api", version.ref = "edc" }' gradle/libs.versions.toml && \
+    sed -i '/\[libraries\]/a edc-json-ld = { module = "org.eclipse.edc:json-ld", version.ref = "edc" }' gradle/libs.versions.toml && \
+    sed -i '/edc.bom.controlplane/a\    runtimeOnly(libs.edc.iam.mock)\n    runtimeOnly(libs.edc.dp.selector.control.api)\n    runtimeOnly(libs.edc.json.ld)\n    runtimeOnly(project(":extensions:gaiax-auth-extension"))\n    runtimeOnly(project(":extensions:did-web-extension"))' runtimes/controlplane/build.gradle.kts && \
+    echo "org.gradle.java.installations.auto-detect=false" >> gradle.properties && \
+    echo "org.gradle.java.installations.auto-download=false" >> gradle.properties
+
+RUN gradle :runtimes:controlplane:shadowJar --no-daemon
+
+FROM eclipse-temurin:21-jre-alpine
+RUN apk --no-cache add curl
+WORKDIR /app
+COPY --from=builder /build/runtimes/controlplane/build/libs/controlplane.jar edc-controlplane.jar
+HEALTHCHECK --interval=5s --timeout=5s --retries=10 CMD curl --fail http://localhost:8080/api/check/health
+CMD ["java", "-Djava.security.egd=file:/dev/urandom", "-jar", "edc-controlplane.jar"]

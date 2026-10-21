@@ -1,0 +1,32 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#",
+        {
+               "imx": "http://w3id.org/imx",
+               "schema": "https://schema.org/"
+        }
+    ],
+    "id": "https://aasnest.io/ids/imx/compliance/pcf-traceability/conn",
+    "type": [
+         "VerifiableCredential",
+         "imx:ConnectorCredential"
+    ],
+    "issuer": "did:web:nf.aasnest.io",
+    "validFrom": "2025-10-09T10:26:07.093+00:00",
+    "validUntil": "2027-01-07T10:26:07.094+00:00",
+    "credentialSubject": {
+          "id": "did:imx:showcase:hm26:connector:nestfield",
+         "schema:name": "Nestfield-PCF-Connector",
+         "schema:description": "Connector for PCF data exchange by Nestfield",
+         "operatedBy": "did:imx:showcase:hm26:entity:nestfield",
+         "supportedStandards": [
+               "imx:DSPStandard",
+               "imx:AASStandard"
+         ],
+         "imx:endPoint": "http://1.214.117.234:8281",
+         "imx:supportedUseCases": [
+                "imx:BatteryPassportUseCase"
+         ]
+    }
+}

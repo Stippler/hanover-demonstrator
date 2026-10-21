@@ -1,0 +1,33 @@
+FROM gradle:8.10-jdk21-alpine AS builder
+WORKDIR /build
+COPY vendor/Template-Basic/ .
+
+# Upgrade EDC to 0.12.0, add mock IAM + public API for HttpData-PULL
+RUN sed -i 's/edc = "0.10.1"/edc = "0.12.0"/' gradle/libs.versions.toml && \
+    sed -i '/\[libraries\]/a edc-iam-mock = { module = "org.eclipse.edc:iam-mock", version.ref = "edc" }' gradle/libs.versions.toml && \
+    sed -i '/\[libraries\]/a edc-dataplane-public-api = { module = "org.eclipse.edc:data-plane-public-api-v2", version.ref = "edc" }' gradle/libs.versions.toml && \
+    sed -i '/edc\.bom\.dataplane)/a\    runtimeOnly(libs.edc.iam.mock)\n    runtimeOnly(libs.edc.dataplane.public.api)' runtimes/dataplane/build.gradle.kts && \
+    echo "org.gradle.java.installations.auto-detect=false" >> gradle.properties
+
+RUN gradle :runtimes:dataplane:shadowJar --no-daemon
+
+# Build the vault-seed extension JAR, compiling against the shadow JAR
+COPY edc/vault-seed-extension/src/main/java/org/eclipse/edc/ext/VaultSeedExtension.java /tmp/ext/VaultSeedExtension.java
+COPY edc/vault-seed-extension/src/main/resources/META-INF/services/org.eclipse.edc.spi.system.ServiceExtension /tmp/ext/spi-file
+RUN mkdir -p /tmp/ext/classes/META-INF/services && \
+    javac -cp /build/runtimes/dataplane/build/libs/dataplane.jar \
+          -d /tmp/ext/classes /tmp/ext/VaultSeedExtension.java && \
+    cp /tmp/ext/spi-file /tmp/ext/classes/META-INF/services/org.eclipse.edc.spi.system.ServiceExtension && \
+    cd /tmp/ext/classes && jar cf /tmp/vault-seed.jar .
+
+FROM eclipse-temurin:21-jre-alpine
+RUN apk --no-cache add curl openssl
+WORKDIR /app
+COPY --from=builder /build/runtimes/dataplane/build/libs/dataplane.jar edc-dataplane.jar
+COPY --from=builder /tmp/vault-seed.jar /app/vault-seed.jar
+
+COPY edc/entrypoint-dp.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+HEALTHCHECK --interval=5s --timeout=5s --retries=10 CMD curl --fail http://localhost:8080/api/check/health
+ENTRYPOINT ["/app/entrypoint.sh"]

@@ -1,0 +1,72 @@
+{
+    auto_https off
+}
+
+# ── Core Apps ──────────────────────────────────────────────────────
+
+dpp.imx.vactory-projects.com:80, dpp.hanover-demonstrator.christian-stippel.com:80 {
+    handle /api/* {
+        reverse_proxy dpp-api:8000
+    }
+    handle {
+        respond "DPP API only" 200
+    }
+}
+
+repair.imx.vactory-projects.com:80, repair.hanover-demonstrator.christian-stippel.com:80 {
+    handle /api/* {
+        reverse_proxy repair-api:8000
+    }
+    handle {
+        reverse_proxy repair-ui:3000
+    }
+}
+
+traces.imx.vactory-projects.com:80, traces.hanover-demonstrator.christian-stippel.com:80 {
+    handle /api/* {
+        reverse_proxy trace-api:8000
+    }
+    handle {
+        reverse_proxy trace-dashboard-ui:3000
+    }
+}
+
+# ── Gaia-X services ─────────────────────────────────────────────────
+
+compliance.imx.vactory-projects.com:80, compliance.hanover-demonstrator.christian-stippel.com:80 {
+    reverse_proxy gx-compliance:3000
+}
+
+# ── EDC connector management APIs ────────────────────────────────────
+
+edc-dpp.imx.vactory-projects.com:80, edc-dpp.hanover-demonstrator.christian-stippel.com:80 {
+    handle /.well-known/* {
+        uri replace /.well-known /api 1
+        reverse_proxy dpp-edc-cp:8080
+    }
+    handle /dsp/* {
+        reverse_proxy dpp-edc-cp:9292
+    }
+    handle /public/* {
+        reverse_proxy dpp-edc-dp:9291
+    }
+    handle {
+        reverse_proxy dpp-edc-cp:9191
+    }
+}
+
+edc-repair-shop.imx.vactory-projects.com:80, edc-repair-shop.hanover-demonstrator.christian-stippel.com:80 {
+    handle /.well-known/* {
+        uri replace /.well-known /api 1
+        reverse_proxy repair-edc-cp:8080
+    }
+    handle /dsp/* {
+        reverse_proxy repair-edc-cp:9292
+    }
+    handle /public/* {
+        reverse_proxy repair-edc-dp:9291
+    }
+    handle {
+        reverse_proxy repair-edc-cp:9191
+    }
+}

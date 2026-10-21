@@ -1,0 +1,269 @@
+services:
+  # ── Reverse Proxy ──────────────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8100:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Gaia-X Compliance ──────────────────────────────────────────────
+  gx-compliance:
+    build:
+      context: ./vendor/gx-compliance
+    entrypoint: ["/app/keys/entrypoint.sh"]
+    command: ["node", "dist/src/main"]
+    environment:
+      PORT: "3000"
+      BASE_URL: https://compliance.imx.vactory-projects.com
+      APP_PATH: ""
+      REGISTRY_URL: http://gx-registry:3000
+      PRIVATE_KEY_ALGORITHM: PS256
+      production: "false"
+      DISABLE_SIGNATURE_CHECK: "true"
+      dburl: bolt://memgraph:7687
+      USE_OFFLINE_DOCUMENT_LOADER: "true"
+      ALLOWED_CONTEXT_VERSIONS: '["development","main","v1","v2","2511"]'
+      vcLifeExpectancyInDays: "90"
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+      - ./certs/gaiax-entrypoint.sh:/app/keys/entrypoint.sh:ro
+    networks:
+      - hanover-internal
+    depends_on:
+      - memgraph
+    restart: unless-stopped
+
+  memgraph:
+    image: memgraph/memgraph:3.4.0
+    command: >-
+      --also-log-to-stderr=true
+      --storage-mode=IN_MEMORY_ANALYTICAL
+      --storage-gc-cycle-sec=15
+      --storage-snapshot-interval-sec=0
+      --storage-wal-enabled=false
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── DPP EDC Connectors ───────────────────────────────────────────
+  dpp-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: dpp
+      EDC_DSP_CALLBACK_ADDRESS: http://dpp-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://dpp-edc-cp:9393/api/control/v1/dataplanes
+      GAIAX_COMPLIANCE_URL: http://gx-compliance:3000
+      GAIAX_TRACE_URL: http://trace-api:8000
+      GAIAX_PRIVATE_KEY_PATH: /app/keys/private.pem
+      GAIAX_DOMAIN: imx.vactory-projects.com
+      GAIAX_VERIFY_ON_NEGOTIATE: "true"
+      GAIAX_LIFECYCLE_TRACES: request_only
+      DIDWEB_DOMAIN: imx.vactory-projects.com
+      DIDWEB_CERTIFICATE_PATH: /app/keys/cert.pem
+      DIDWEB_PARTICIPANT_NAME: "Atomic"
+      DIDWEB_PARTICIPANT_COUNTRY: "AT"
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  dpp-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: dpp-dataplane
+      EDC_PARTICIPANT_ID: dpp
+      EDC_HOSTNAME: dpp-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://dpp-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: dppkey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: dppkey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Repair Shop EDC Connectors ───────────────────────────────────
+  repair-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: repair_shop
+      EDC_DSP_CALLBACK_ADDRESS: http://repair-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://repair-edc-cp:9393/api/control/v1/dataplanes
+      GAIAX_COMPLIANCE_URL: http://gx-compliance:3000
+      GAIAX_TRACE_URL: http://trace-api:8000
+      GAIAX_PRIVATE_KEY_PATH: /app/keys/private.pem
+      GAIAX_DOMAIN: imx.vactory-projects.com
+      DIDWEB_DOMAIN: imx.vactory-projects.com
+      DIDWEB_CERTIFICATE_PATH: /app/keys/cert.pem
+      DIDWEB_PARTICIPANT_NAME: "Wintersteiger Machine"
+      DIDWEB_PARTICIPANT_COUNTRY: "AT"
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  repair-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: repair-dataplane
+      EDC_PARTICIPANT_ID: repair_shop
+      EDC_HOSTNAME: repair-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://repair-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: repairkey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: repairkey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Core Backends (FastAPI) ──────────────────────────────────────
+  dpp-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: dpp
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${DPP_USERS:-demo:demo,dpp:dpp}
+      API_SECRET: ${EDC_INTERNAL_SECRET:-edc-internal-2026}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TRACE_COLLECTOR_URL: http://trace-api:8000
+      EDC_MGMT_URL: http://dpp-edc-cp:9191/api/management
+      EDC_API_KEY: ${EDC_API_KEY:-password}
+      EDC_SEED_ENABLED: "true"
+      AAS_REPO_URL: ${AAS_REPO_URL:-https://atomic-ski.passat.srfg.at}
+      AAS_CARRIER_BASE: ${AAS_CARRIER_BASE:-http://wseqr.amersports.com}
+      AAS_MACHINE_TYPE: ${AAS_MACHINE_TYPE:-Jupiter-X-TEST}
+      AAS_MACHINE_NUMBER: ${AAS_MACHINE_NUMBER:-1234-1234}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  repair-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: repair
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${REPAIR_USERS:-demo:demo,repair:repair}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TRACE_COLLECTOR_URL: http://trace-api:8000
+      EDC_MGMT_URL: http://repair-edc-cp:9191/api/management
+      EDC_API_KEY: ${EDC_API_KEY:-password}
+      DPP_DSP_URL: http://dpp-edc-cp:9292/api/dsp
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  trace-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: trace
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${TRACE_USERS:-demo:demo,trace:trace}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      EDC_API_KEY: ${EDC_API_KEY:-password}
+      COMPOSE_PROJECT: hanover-demonstrator
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  # ── Frontends (Next.js) ──────────────────────────────────────────
+  repair-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: repair
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: repair_shop
+      NEXT_PUBLIC_APP_TITLE: Repair Shop
+      NEXT_PUBLIC_API_URL: /api
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  trace-dashboard-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: trace-dashboard
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: admin
+      NEXT_PUBLIC_APP_TITLE: Trace Dashboard
+      NEXT_PUBLIC_API_URL: /api
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+networks:
+  hanover-internal:
+    driver: bridge
+  supabase_default:
+    external: true

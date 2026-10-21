@@ -1,0 +1,472 @@
+# Legacy services from the original demonstrator.
+# Not required for the core Repair → DPP flow.
+#
+# Start with: docker compose -f docker-compose.yml -f docker-compose.legacy.yml up -d
+
+services:
+  # ── Gaia-X Infrastructure (optional) ─────────────────────────────
+  gx-registry:
+    build:
+      context: ./vendor/gx-registry
+    entrypoint: ["/app/keys/entrypoint.sh"]
+    command: ["node", "dist/src/main"]
+    environment:
+      PORT: "3000"
+      BASE_URL: https://registry.imx.vactory-projects.com
+      APP_PATH: ""
+      ONTOLOGY_VERSION: development
+      KUBO_HOST: kubo
+      evsslonly: "false"
+      PRIVATE_KEY_ALGORITHM: PS256
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+      - ./certs/gaiax-entrypoint.sh:/app/keys/entrypoint.sh:ro
+    networks:
+      - hanover-internal
+    depends_on:
+      - kubo
+    restart: unless-stopped
+
+  kubo:
+    image: ipfs/kubo
+    volumes:
+      - ipfs-data:/data/ipfs
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  gx-notary:
+    build:
+      context: ./vendor/gaia-x-notary-registrationnumber
+    entrypoint: ["/app/keys/entrypoint.sh"]
+    command: ["node", "dist/src/main"]
+    environment:
+      APP_PATH: ""
+      BASE_URL: https://notary.imx.vactory-projects.com
+      PRIVATE_KEY_ALGORITHM: PS256
+      EORI_VALIDATION_API: https://ec.europa.eu/taxation_customs/dds2/eos/validation/services/validation
+      LEI_CODE_VALIDATION_API: https://api.gleif.org/api/v1/lei-records/
+      VAT_ID_VALIDATION_API: https://ec.europa.eu/taxation_customs/vies/services/checkVatService
+      OPEN_CORPORATES_VALIDATION_API: https://api.opencorporates.com/v0.4/companies/search
+      OPEN_CORPORATES_VALIDATION_API_KEY: ""
+      OFFLINE_CONTEXTS: "false"
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+      - ./certs/gaiax-entrypoint.sh:/app/keys/entrypoint.sh:ro
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Legacy EDC Connectors ────────────────────────────────────────
+  vendor-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: vendor
+      EDC_DSP_CALLBACK_ADDRESS: http://vendor-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://vendor-edc-cp:9393/api/control/v1/dataplanes
+      GAIAX_TRACE_URL: http://trace-api:8000
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  vendor-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: vendor-dataplane
+      EDC_PARTICIPANT_ID: vendor
+      EDC_HOSTNAME: vendor-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://vendor-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: vendorkey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: vendorkey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  owner-a-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: owner_a
+      EDC_DSP_CALLBACK_ADDRESS: http://owner-a-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://owner-a-edc-cp:9393/api/control/v1/dataplanes
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  owner-a-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: owner-a-dataplane
+      EDC_PARTICIPANT_ID: owner_a
+      EDC_HOSTNAME: owner-a-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://owner-a-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: ownerakey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: ownerakey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  owner-b-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: owner_b
+      EDC_DSP_CALLBACK_ADDRESS: http://owner-b-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://owner-b-edc-cp:9393/api/control/v1/dataplanes
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  owner-b-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: owner-b-dataplane
+      EDC_PARTICIPANT_ID: owner_b
+      EDC_HOSTNAME: owner-b-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://owner-b-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: ownerbkey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: ownerbkey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  service-edc-cp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.controlplane
+    environment:
+      EDC_PARTICIPANT_ID: service_shop
+      EDC_DSP_CALLBACK_ADDRESS: http://service-edc-cp:9292/api/dsp
+      EDC_IAM_DID_WEB_USE_HTTPS: "false"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "9191"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: tokenbased
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: ${EDC_API_KEY:-password}
+      WEB_HTTP_PROTOCOL_PORT: "9292"
+      WEB_HTTP_PROTOCOL_PATH: "/api/dsp"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      EDC_DPF_SELECTOR_URL: http://service-edc-cp:9393/api/control/v1/dataplanes
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  service-edc-dp:
+    build:
+      context: .
+      dockerfile: edc/Dockerfile.dataplane
+    environment:
+      EDC_RUNTIME_ID: service-dataplane
+      EDC_PARTICIPANT_ID: service_shop
+      EDC_HOSTNAME: service-edc-dp
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_CONTROL_PORT: "9393"
+      WEB_HTTP_CONTROL_PATH: "/api/control"
+      WEB_HTTP_PUBLIC_PORT: "9291"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      EDC_DPF_SELECTOR_URL: http://service-edc-cp:9393/api/control/v1/dataplanes
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: servicekey-pub
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: servicekey
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Legacy Backends ──────────────────────────────────────────────
+  vendor-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: vendor
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${VENDOR_USERS:-demo:demo,vendor:vendor}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  vault-a-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: owner_a
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${VAULT_A_USERS:-demo:demo,anna:anna}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  vault-b-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: owner_b
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${VAULT_B_USERS:-demo:demo,bob:bob}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  service-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: service
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${SERVICE_USERS:-demo:demo,tech:tech}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  admin-api:
+    build:
+      context: ./backend
+    environment:
+      APP_NAME: admin
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      APP_USERS: ${ADMIN_USERS:-demo:demo,admin:admin}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - hanover-internal
+      - supabase_default
+    restart: unless-stopped
+
+  # ── Legacy Frontends ─────────────────────────────────────────────
+  vendor-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: vendor
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: vendor
+      NEXT_PUBLIC_APP_TITLE: Vendor
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  vault-a-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: vault-a
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: owner_a
+      NEXT_PUBLIC_APP_TITLE: VaultA
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  vault-b-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: vault-b
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: owner_b
+      NEXT_PUBLIC_APP_TITLE: VaultB
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  service-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: service
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: service_shop
+      NEXT_PUBLIC_APP_TITLE: Service Shop
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: admin
+    environment:
+      NEXT_PUBLIC_PARTICIPANT_ID: admin
+      NEXT_PUBLIC_APP_TITLE: Admin
+      NEXT_PUBLIC_API_URL: /api
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-${SUPABASE_URL}}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    networks:
+      - hanover-internal
+    restart: unless-stopped
+
+  # ── Legacy Gaia-X Bridge ────────────────────────────────────────
+  gaiax-bridge:
+    build:
+      context: ./bridge
+    environment:
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GX_COMPLIANCE_URL: http://gx-compliance:3000
+      GX_REGISTRY_URL: http://gx-registry:3000
+      GX_NOTARY_URL: http://gx-notary:3000
+      DOMAIN: imx.vactory-projects.com
+      EDC_API_KEY: ${EDC_API_KEY:-password}
+      EDC_INTERNAL_SECRET: ${EDC_INTERNAL_SECRET:-edc-internal-2026}
+    volumes:
+      - ./certs/gaiax-key-pkcs8.pem:/app/keys/private.pem:ro
+      - ./certs/gaiax-cert.pem:/app/keys/cert.pem:ro
+    networks:
+      - hanover-internal
+      - supabase_default
+    depends_on:
+      - gx-compliance
+    restart: unless-stopped
+
+  # ── E2E test ─────────────────────────────────────────────────────
+  e2e-test:
+    build:
+      context: ./backend
+    command: ["python", "scripts/e2e_test.py"]
+    environment:
+      VENDOR_API_URL: http://vendor-api:8000
+      VAULT_A_API_URL: http://vault-a-api:8000
+      VAULT_B_API_URL: http://vault-b-api:8000
+      SERVICE_API_URL: http://service-api:8000
+      ADMIN_API_URL: http://admin-api:8000
+      E2E_USER: demo
+      E2E_PASSWORD: demo
+    networks:
+      - hanover-internal
+    depends_on:
+      - vendor-api
+      - vault-a-api
+      - vault-b-api
+      - service-api
+      - admin-api
+
+volumes:
+  ipfs-data:
+    driver: local

@@ -1,0 +1,27 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#",
+         {
+              "imx": "http://w3id.org/imx",
+              "schema": "https://schema.org/"
+         }
+     ],
+     "id": "https://aasnest.io/ids/imx/compliance/pcf-traceability/service",
+     "type": [
+           "VerifiableCredential",
+           "imx:ServiceCredential"
+      ],
+      "issuer": "did:web:nf.aasnest.io",
+      "validFrom": "2025-10-09T10:26:07.093+00:00",
+      "validUntil": "2027-01-07T10:26:07.094+00:00",
+      "credentialSubject": {
+            "id": "did:imx:showcase:hm26:service:nestfield-aas-server",
+            "schema:name": "Nestfield AAS Server",
+            "schema:description": "Industrial Data Exchange Platform",
+            "imx:operatedBy": "did:imx:showcase:hm26:entity:nestfield",
+            "imx:supportedStandards": "imx:AASStandard",
+            "imx:endPoint": "http://1.214.117.234:20481/api/v3.0",
+            "imx:supportedUseCases": "imx:BatteryPassportUseCase"
+      }
+}

@@ -1,0 +1,32 @@
+{
+    "@context": [
+        "https://www.w3.org/ns/credentials/v2",
+        "https://w3id.org/gaia-x/development#",
+        {
+            "imx": "http://w3id.org/imx",
+            "schema": "https://schema.org/"
+        }
+    ],
+    "id": "https://aasnest.io/ids/imx/compliance/pcf-traceability/",
+    "type": [
+        "VerifiableCredential",
+        "imx:ApplicationCredential"
+    ],
+    "issuer": "did:web:nf.aasnest.io",
+    "validFrom": "2025-10-09T10:26:07.093+00:00",
+    "validUntil": "2027-01-07T10:26:07.094+00:00",
+    "credentialSubject": {
+        "id": "did:imx:showcase:hm26:application:PCFTraceability",
+        "schema:name": "PCF-Traceability",
+        "schema:description": "PCF Application provided by Nestfield",
+        "imx:operatedBy": "did:imx:showcase:hm26:entity:nestfield",
+        "imx:supportedStandards": [
+               "imx:AASStandard"
+        ],
+        "imx:endPoint": "http://1.214.117.234:20485/", 
+        "imx:supportedUseCases": [
+            "imx:BatteryPassportUseCase"
+        ]
+    }
+}
+
